@@ -12,6 +12,17 @@ class AppTheme {
     );
   }
 
+  static FluentThemeData lightTheme() {
+    return FluentThemeData(
+      brightness: Brightness.light,
+      accentColor: Colors.blue,
+      scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+      navigationPaneTheme: const NavigationPaneThemeData(
+        backgroundColor: Color(0xFFFFFFFF),
+      ),
+    );
+  }
+
   static const Color glassBackground = Color(0x30FFFFFF);
   static const Color glassBorder = Color(0x50FFFFFF);
   static const Color primaryGradientStart = Color(0xFF4A90E2);

@@ -56,18 +56,13 @@ app.*.map.json
 *.jks
 *.keystore
 
-# Exception: Debug keystore for GitHub Actions
-!android/app/debug.keystore
-
 # Security & Sensitive files
 key.properties
-*.keystore
-*.jks
 google-services.json
 firebase_options.dart
-
-# Exception: Debug keystore for GitHub Actions
-!android/app/debug.keystore
+android/app/zedsecure-release-new.keystore
+keystore-base64.txt
+convert-keystore.ps1
 
 # Windows
 Thumbs.db

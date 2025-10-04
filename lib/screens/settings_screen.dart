@@ -1,9 +1,16 @@
 import 'package:fluent_ui/fluent_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:zedsecure/services/v2ray_service.dart';
+import 'package:zedsecure/services/theme_service.dart';
 import 'package:zedsecure/theme/app_theme.dart';
+import 'package:zedsecure/models/subscription.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zedsecure/screens/per_app_proxy_screen.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -15,7 +22,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _autoConnect = false;
   bool _killSwitch = false;
-  bool _darkMode = true;
 
   @override
   void initState() {
@@ -28,7 +34,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _autoConnect = prefs.getBool('auto_connect') ?? false;
       _killSwitch = prefs.getBool('kill_switch') ?? false;
-      _darkMode = prefs.getBool('dark_mode') ?? true;
     });
   }
 
@@ -96,16 +101,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSection(
             'Appearance',
             [
-              _buildSettingTile(
-                'Dark Mode',
-                'Use dark theme',
-                FluentIcons.clear_night,
-                _darkMode,
-                (value) {
-                  setState(() {
-                    _darkMode = value;
-                  });
-                  _saveSetting('dark_mode', value);
+              Consumer<ThemeService>(
+                builder: (context, themeService, child) {
+                  return _buildSettingTile(
+                    'Dark Mode',
+                    themeService.isDarkMode ? 'Using dark theme' : 'Using light theme',
+                    themeService.isDarkMode ? FluentIcons.clear_night : FluentIcons.sunny,
+                    themeService.isDarkMode,
+                    (value) async {
+                      await themeService.setThemeMode(value ? ThemeMode.dark : ThemeMode.light);
+                    },
+                  );
                 },
               ),
             ],
@@ -114,6 +120,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSection(
             'Data',
             [
+              _buildActionTile(
+                'Backup Configs',
+                'Export all configs to Downloads',
+                FluentIcons.cloud_upload,
+                () => _backupConfigs(),
+              ),
+              _buildActionTile(
+                'Restore Configs',
+                'Import configs from backup file',
+                FluentIcons.cloud_download,
+                () => _restoreConfigs(),
+              ),
               _buildActionTile(
                 'Clear Server Cache',
                 'Clear all cached server data',
@@ -133,8 +151,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'About',
             [
               _buildInfoTile('App Name', 'Zed-Secure'),
-              _buildInfoTile('Version', '1.0.0'),
-              _buildInfoTile('Build', '1'),
+              _buildInfoTile('Version', '1.2.0'),
+              _buildInfoTile('Build', '3'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Developed by CluvexStudio',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => _launchURL('https://github.com/CluvexStudio/ZedSecure'),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(FluentIcons.globe, size: 16, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          Text(
+                            'github.com/CluvexStudio/ZedSecure',
+                            style: TextStyle(
+                              color: Colors.blue,
+                              decoration: TextDecoration.underline,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
@@ -348,6 +401,270 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _backupConfigs() async {
+    try {
+      final service = Provider.of<V2RayService>(context, listen: false);
+      final configs = await service.loadConfigs();
+      final subscriptions = await service.loadSubscriptions();
+
+      if (configs.isEmpty && subscriptions.isEmpty) {
+        if (mounted) {
+          await displayInfoBar(
+            context,
+            builder: (context, close) {
+              return const InfoBar(
+                title: Text('No Data'),
+                content: Text('No configs or subscriptions to backup'),
+                severity: InfoBarSeverity.warning,
+              );
+            },
+            duration: const Duration(seconds: 2),
+          );
+        }
+        return;
+      }
+
+      final backupData = {
+        'version': '1.0',
+        'timestamp': DateTime.now().toIso8601String(),
+        'configs': configs.map((c) => c.toJson()).toList(),
+        'subscriptions': subscriptions.map((s) => s.toJson()).toList(),
+      };
+
+      final jsonString = const JsonEncoder.withIndent('  ').convert(backupData);
+
+      Directory? directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+        if (!await directory.exists()) {
+          directory = await getExternalStorageDirectory();
+        }
+      } else {
+        directory = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      }
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final file = File('${directory!.path}/zedsecure_backup_$timestamp.json');
+      await file.writeAsString(jsonString);
+
+      if (mounted) {
+        await displayInfoBar(
+          context,
+          builder: (context, close) {
+            return InfoBar(
+              title: const Text('Backup Created'),
+              content: Text('Saved to: ${file.path}'),
+              severity: InfoBarSeverity.success,
+            );
+          },
+          duration: const Duration(seconds: 4),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        await displayInfoBar(
+          context,
+          builder: (context, close) {
+            return InfoBar(
+              title: const Text('Backup Failed'),
+              content: Text('Error: ${e.toString()}'),
+              severity: InfoBarSeverity.error,
+            );
+          },
+          duration: const Duration(seconds: 3),
+        );
+      }
+    }
+  }
+
+  Future<void> _restoreConfigs() async {
+    try {
+      Directory? directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+        if (!await directory.exists()) {
+          directory = await getExternalStorageDirectory();
+        }
+      } else {
+        directory = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      }
+
+      final files = directory!.listSync()
+          .where((f) => f.path.contains('zedsecure_backup_') && f.path.endsWith('.json'))
+          .toList();
+
+      if (files.isEmpty) {
+        if (mounted) {
+          await displayInfoBar(
+            context,
+            builder: (context, close) {
+              return const InfoBar(
+                title: Text('No Backups Found'),
+                content: Text('No backup files found in Downloads folder'),
+                severity: InfoBarSeverity.warning,
+              );
+            },
+            duration: const Duration(seconds: 3),
+          );
+        }
+        return;
+      }
+
+      files.sort((a, b) => b.path.compareTo(a.path));
+
+      await showDialog(
+        context: context,
+        builder: (context) => ContentDialog(
+          title: const Text('Select Backup File'),
+          content: SizedBox(
+            width: 400,
+            height: 300,
+            child: ListView.builder(
+              itemCount: files.length,
+              itemBuilder: (context, index) {
+                final file = files[index];
+                final filename = file.path.split('/').last;
+                return ListTile(
+                  title: Text(filename),
+                  subtitle: Text(File(file.path).statSync().modified.toString()),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await _performRestore(file.path);
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            Button(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        await displayInfoBar(
+          context,
+          builder: (context, close) {
+            return InfoBar(
+              title: const Text('Restore Failed'),
+              content: Text('Error: ${e.toString()}'),
+              severity: InfoBarSeverity.error,
+            );
+          },
+          duration: const Duration(seconds: 3),
+        );
+      }
+    }
+  }
+
+  Future<void> _performRestore(String filePath) async {
+    try {
+      final file = File(filePath);
+      final jsonString = await file.readAsString();
+      final backupData = jsonDecode(jsonString) as Map<String, dynamic>;
+
+      final service = Provider.of<V2RayService>(context, listen: false);
+      int configsImported = 0;
+      int subsImported = 0;
+
+      // Import configs
+      if (backupData['configs'] != null) {
+        final configsList = backupData['configs'] as List;
+        final existingConfigs = await service.loadConfigs();
+        
+        for (var configJson in configsList) {
+          try {
+            final configMap = configJson as Map<String, dynamic>;
+            final fullConfig = configMap['fullConfig'] as String;
+            final parsedConfigs = await service.parseSubscriptionContent(fullConfig);
+            existingConfigs.addAll(parsedConfigs);
+            configsImported++;
+          } catch (e) {
+            debugPrint('Error parsing config: $e');
+          }
+        }
+        
+        await service.saveConfigs(existingConfigs);
+      }
+
+      // Import subscriptions
+      if (backupData['subscriptions'] != null) {
+        final subsList = backupData['subscriptions'] as List;
+        final existingSubs = await service.loadSubscriptions();
+        
+        for (var subJson in subsList) {
+          try {
+            final sub = Subscription.fromJson(subJson as Map<String, dynamic>);
+            if (!existingSubs.any((s) => s.url == sub.url)) {
+              existingSubs.add(sub);
+              subsImported++;
+            }
+          } catch (e) {
+            debugPrint('Error parsing subscription: $e');
+          }
+        }
+        
+        await service.saveSubscriptions(existingSubs);
+      }
+
+      if (mounted) {
+        await displayInfoBar(
+          context,
+          builder: (context, close) {
+            return InfoBar(
+              title: const Text('Restore Complete'),
+              content: Text(
+                'Imported $configsImported config(s) and $subsImported subscription(s)'
+              ),
+              severity: InfoBarSeverity.success,
+            );
+          },
+          duration: const Duration(seconds: 3),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        await displayInfoBar(
+          context,
+          builder: (context, close) {
+            return InfoBar(
+              title: const Text('Restore Failed'),
+              content: Text('Error: ${e.toString()}'),
+              severity: InfoBarSeverity.error,
+            );
+          },
+          duration: const Duration(seconds: 3),
+        );
+      }
+    }
+  }
+
+  Future<void> _launchURL(String url) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: url));
+      if (mounted) {
+        await displayInfoBar(
+          context,
+          builder: (context, close) {
+            return const InfoBar(
+              title: Text('Link Copied'),
+              content: Text('GitHub link copied to clipboard'),
+              severity: InfoBarSeverity.success,
+            );
+          },
+          duration: const Duration(seconds: 2),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error copying URL: $e');
+    }
   }
 }
 

@@ -4,6 +4,9 @@ import 'package:zedsecure/services/v2ray_service.dart';
 import 'package:zedsecure/models/v2ray_config.dart';
 import 'package:zedsecure/theme/app_theme.dart';
 import 'package:flutter/services.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class ServersScreen extends StatefulWidget {
   const ServersScreen({super.key});
@@ -59,24 +62,32 @@ class _ServersScreenState extends State<ServersScreen> {
 
     final service = Provider.of<V2RayService>(context, listen: false);
     
+    // Ping all servers concurrently (parallel) with maximum 10 at a time
+    final futures = <Future>[];
     for (int i = 0; i < _configs.length; i++) {
       final config = _configs[i];
-      try {
-        final ping = await service.getServerDelay(config);
+      
+      final future = service.getServerDelay(config).then((ping) {
         if (mounted) {
           setState(() {
             _pingResults[config.id] = ping ?? -1;
           });
         }
-      } catch (e) {
+      }).catchError((e) {
         if (mounted) {
           setState(() {
             _pingResults[config.id] = -1;
           });
         }
-      }
+      });
       
-      await Future.delayed(const Duration(milliseconds: 100));
+      futures.add(future);
+      
+      // Process in batches of 10 to avoid too many concurrent requests
+      if (futures.length >= 10 || i == _configs.length - 1) {
+        await Future.wait(futures);
+        futures.clear();
+      }
     }
 
     if (mounted) {
@@ -180,24 +191,33 @@ class _ServersScreenState extends State<ServersScreen> {
     return ScaffoldPage(
       header: PageHeader(
         title: const Text('Servers', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-        commandBar: Row(
-          mainAxisSize: MainAxisSize.min,
+        commandBar: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.end,
           children: [
-            FilledButton(
+            IconButton(
+              icon: const Icon(FluentIcons.paste, size: 18),
               onPressed: _importFromClipboard,
-              child: const Icon(FluentIcons.paste, size: 16),
             ),
-            const SizedBox(width: 8),
-            FilledButton(
+            IconButton(
+              icon: const Icon(FluentIcons.q_r_code, size: 18),
+              onPressed: _scanQRCode,
+            ),
+            IconButton(
+              icon: _isSorting
+                  ? const SizedBox(width: 18, height: 18, child: ProgressRing())
+                  : const Icon(FluentIcons.sort, size: 18),
               onPressed: _isSorting ? null : _pingAllServers,
-              child: _isSorting
-                  ? const SizedBox(width: 20, height: 20, child: ProgressRing())
-                  : const Icon(FluentIcons.sort, size: 16),
             ),
-            const SizedBox(width: 8),
-            FilledButton(
+            if (_pingResults.values.any((ping) => ping == -1))
+              IconButton(
+                icon: Icon(FluentIcons.delete, size: 18, color: Colors.red),
+                onPressed: _deleteDeadConfigs,
+              ),
+            IconButton(
+              icon: const Icon(FluentIcons.refresh, size: 18),
               onPressed: _loadConfigs,
-              child: const Icon(FluentIcons.refresh, size: 16),
             ),
           ],
         ),
@@ -297,88 +317,144 @@ class _ServersScreenState extends State<ServersScreen> {
     final isConnected = service.activeConfig?.id == config.id;
     final isSelected = _selectedConfigId == config.id;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: AppTheme.glassDecoration(
-        borderRadius: 12, 
-        opacity: isConnected ? 0.15 : (isSelected ? 0.1 : 0.05),
-      ),
-      child: ListTile(
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: AppTheme.getPingColor(ping).withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: Icon(
-              _getProtocolIcon(config.configType),
-              color: AppTheme.getPingColor(ping),
-              size: 24,
-            ),
-          ),
+    return GestureDetector(
+      onTap: isConnected ? null : () => _handleSelectConfig(config),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: AppTheme.glassDecoration(
+          borderRadius: 12, 
+          opacity: isConnected ? 0.15 : (isSelected ? 0.1 : 0.05),
+        ).copyWith(
+          border: isSelected && !isConnected
+              ? Border.all(color: Colors.blue.withOpacity(0.5), width: 2)
+              : null,
         ),
-        title: Text(
-          config.remark,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text('${config.address}:${config.port} • ${config.protocolDisplay}'),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (ping != null && ping >= 0)
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: AppTheme.getPingColor(ping).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
-                  '${ping}ms',
-                  style: TextStyle(
+                child: Center(
+                  child: Icon(
+                    _getProtocolIcon(config.configType),
                     color: AppTheme.getPingColor(ping),
-                    fontWeight: FontWeight.bold,
+                    size: 24,
                   ),
                 ),
               ),
-            if (ping != null && ping == -1)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Text(
-                  '-1 ms',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontWeight: FontWeight.bold,
-                  ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      config.remark,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${config.address}:${config.port} • ${config.protocolDisplay}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[100],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-            if (ping == null)
+              const SizedBox(width: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+              if (ping != null && ping >= 0)
+                Container(
+                  constraints: const BoxConstraints(minWidth: 50),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.getPingColor(ping).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${ping}ms',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppTheme.getPingColor(ping),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              if (ping != null && ping == -1)
+                Container(
+                  constraints: const BoxConstraints(minWidth: 50),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Fail',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              if (ping == null)
+                const SizedBox(width: 50),
+              const SizedBox(width: 4),
               IconButton(
-                icon: const Icon(FluentIcons.speed_high),
+                icon: const Icon(FluentIcons.speed_high, size: 16),
                 onPressed: () => _pingSingleServer(config),
               ),
-            const SizedBox(width: 8),
-            if (!isConnected)
               IconButton(
                 icon: Icon(
-                  isSelected ? FluentIcons.radio_btn_on : FluentIcons.radio_btn_off,
-                  color: isSelected ? Colors.blue : null,
+                  isConnected ? FluentIcons.plug_disconnected : FluentIcons.plug_connected,
+                  size: 16,
                 ),
-                onPressed: () => _handleSelectConfig(config),
+                onPressed: () => _handleConnect(config),
               ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: Icon(
-                isConnected ? FluentIcons.plug_disconnected : FluentIcons.plug_connected,
+              DropDownButton(
+                leading: const Icon(FluentIcons.more_vertical, size: 16),
+                items: [
+                  MenuFlyoutItem(
+                    leading: const Icon(FluentIcons.copy, size: 14),
+                    text: const Text('Copy Config'),
+                    onPressed: () => _copyConfig(config),
+                  ),
+                  MenuFlyoutItem(
+                    leading: const Icon(FluentIcons.q_r_code, size: 14),
+                    text: const Text('Show QR Code'),
+                    onPressed: () => _showQRCode(config),
+                  ),
+                  if (!isConnected)
+                    MenuFlyoutItem(
+                      leading: Icon(FluentIcons.delete, size: 14, color: Colors.red),
+                      text: const Text('Delete'),
+                      onPressed: () => _deleteConfig(config),
+                    ),
+                ],
               ),
-              onPressed: () => _handleConnect(config),
-            ),
-          ],
+            ],
+          ),
+            ],
+          ),
         ),
       ),
     );
@@ -423,11 +499,265 @@ class _ServersScreenState extends State<ServersScreen> {
   }
 
   Future<void> _pingSingleServer(V2RayConfig config) async {
+    setState(() {
+      _pingResults[config.id] = null; // Show loading
+    });
+    
     final service = Provider.of<V2RayService>(context, listen: false);
     final ping = await service.getServerDelay(config);
-    setState(() {
-      _pingResults[config.id] = ping;
-    });
+    
+    if (mounted) {
+      setState(() {
+        _pingResults[config.id] = ping ?? -1;
+      });
+    }
+  }
+
+  Future<void> _deleteConfig(V2RayConfig config) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => ContentDialog(
+        title: const Text('Delete Config'),
+        content: Text('Are you sure you want to delete "${config.remark}"?'),
+        actions: [
+          Button(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      final service = Provider.of<V2RayService>(context, listen: false);
+      final configs = await service.loadConfigs();
+      configs.removeWhere((c) => c.id == config.id);
+      await service.saveConfigs(configs);
+      service.clearPingCache(configId: config.id);
+      
+      await _loadConfigs();
+      
+      if (mounted) {
+        await displayInfoBar(
+          context,
+          builder: (context, close) {
+            return InfoBar(
+              title: const Text('Config Deleted'),
+              content: Text('${config.remark} has been deleted'),
+              severity: InfoBarSeverity.warning,
+            );
+          },
+          duration: const Duration(seconds: 2),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteDeadConfigs() async {
+    final deadConfigs = _configs.where((config) {
+      final ping = _pingResults[config.id];
+      return ping == -1;
+    }).toList();
+
+    if (deadConfigs.isEmpty) {
+      await displayInfoBar(
+        context,
+        builder: (context, close) {
+          return const InfoBar(
+            title: Text('No Dead Configs'),
+            content: Text('All configs are working fine'),
+            severity: InfoBarSeverity.info,
+          );
+        },
+        duration: const Duration(seconds: 2),
+      );
+      return;
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => ContentDialog(
+        title: const Text('Delete Dead Configs'),
+        content: Text(
+          'Found ${deadConfigs.length} dead config(s) with timeout or failed ping.\n\n'
+          'Do you want to delete them?'
+        ),
+        actions: [
+          Button(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete All'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      final service = Provider.of<V2RayService>(context, listen: false);
+      final configs = await service.loadConfigs();
+      
+      final deadIds = deadConfigs.map((c) => c.id).toSet();
+      configs.removeWhere((c) => deadIds.contains(c.id));
+      
+      await service.saveConfigs(configs);
+      
+      for (var config in deadConfigs) {
+        service.clearPingCache(configId: config.id);
+      }
+      
+      await _loadConfigs();
+      setState(() {
+        _pingResults.clear();
+      });
+      
+      if (mounted) {
+        await displayInfoBar(
+          context,
+          builder: (context, close) {
+            return InfoBar(
+              title: const Text('Dead Configs Deleted'),
+              content: Text('Deleted ${deadConfigs.length} dead config(s)'),
+              severity: InfoBarSeverity.success,
+            );
+          },
+          duration: const Duration(seconds: 3),
+        );
+      }
+    }
+  }
+
+  Future<void> _copyConfig(V2RayConfig config) async {
+    await Clipboard.setData(ClipboardData(text: config.fullConfig));
+    if (mounted) {
+      await displayInfoBar(
+        context,
+        builder: (context, close) {
+          return InfoBar(
+            title: const Text('Config Copied'),
+            content: Text('${config.remark} copied to clipboard'),
+            severity: InfoBarSeverity.success,
+          );
+        },
+        duration: const Duration(seconds: 2),
+      );
+    }
+  }
+
+  Future<void> _showQRCode(V2RayConfig config) async {
+    await showDialog(
+      context: context,
+      builder: (context) => ContentDialog(
+        title: Text(config.remark),
+        content: SizedBox(
+          width: 350,
+          height: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: QrImageView(
+                  data: config.fullConfig,
+                  version: QrVersions.auto,
+                  size: 300,
+                  backgroundColor: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Scan this QR code to import config',
+                style: TextStyle(fontSize: 12, color: Colors.grey[100]),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _scanQRCode() async {
+    // Request camera permission
+    final status = await Permission.camera.request();
+    if (!status.isGranted) {
+      if (mounted) {
+        await displayInfoBar(
+          context,
+          builder: (context, close) {
+            return const InfoBar(
+              title: Text('Permission Denied'),
+              content: Text('Camera permission is required to scan QR codes'),
+              severity: InfoBarSeverity.error,
+            );
+          },
+          duration: const Duration(seconds: 3),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      await Navigator.push(
+        context,
+        FluentPageRoute(
+          builder: (context) => _QRScannerScreen(
+            onQRScanned: (String code) async {
+              Navigator.pop(context);
+              try {
+                final service = Provider.of<V2RayService>(context, listen: false);
+                final config = await service.parseConfigFromClipboard(code);
+                if (config != null) {
+                  await _loadConfigs();
+                  if (mounted) {
+                    await displayInfoBar(
+                      context,
+                      builder: (context, close) {
+                        return InfoBar(
+                          title: const Text('Config Added'),
+                          content: Text('${config.remark} added from QR code'),
+                          severity: InfoBarSeverity.success,
+                        );
+                      },
+                      duration: const Duration(seconds: 2),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  await displayInfoBar(
+                    context,
+                    builder: (context, close) {
+                      return InfoBar(
+                        title: const Text('Invalid QR Code'),
+                        content: Text(e.toString()),
+                        severity: InfoBarSeverity.error,
+                      );
+                    },
+                    duration: const Duration(seconds: 3),
+                  );
+                }
+              }
+            },
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _handleConnect(V2RayConfig config) async {
@@ -469,6 +799,92 @@ class _ServersScreenState extends State<ServersScreen> {
         );
       }
     }
+  }
+}
+
+class _QRScannerScreen extends StatefulWidget {
+  final Function(String) onQRScanned;
+
+  const _QRScannerScreen({required this.onQRScanned});
+
+  @override
+  State<_QRScannerScreen> createState() => _QRScannerScreenState();
+}
+
+class _QRScannerScreenState extends State<_QRScannerScreen> {
+  final MobileScannerController controller = MobileScannerController();
+  bool isScanning = true;
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (isScanning) {
+      final List<Barcode> barcodes = capture.barcodes;
+      for (final barcode in barcodes) {
+        if (barcode.rawValue != null) {
+          isScanning = false;
+          controller.stop();
+          widget.onQRScanned(barcode.rawValue!);
+          break;
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaffoldPage(
+      header: PageHeader(
+        title: const Text('Scan QR Code'),
+        leading: IconButton(
+          icon: const Icon(FluentIcons.back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      content: Stack(
+        children: [
+          MobileScanner(
+            controller: controller,
+            onDetect: _onDetect,
+          ),
+          Positioned(
+            bottom: 40,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Position the QR code within the frame',
+                  style: TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ),
+            ),
+          ),
+          Center(
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Colors.blue,
+                  width: 3,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

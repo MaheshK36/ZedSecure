@@ -1,6 +1,7 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:zedsecure/services/v2ray_service.dart';
+import 'package:zedsecure/services/theme_service.dart';
 import 'package:zedsecure/theme/app_theme.dart';
 import 'package:zedsecure/screens/home_screen.dart';
 import 'package:zedsecure/screens/servers_screen.dart';
@@ -16,14 +17,22 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => V2RayService(),
-      child: FluentApp(
-        title: 'Zed-Secure VPN',
-        themeMode: ThemeMode.dark,
-        darkTheme: AppTheme.darkTheme(),
-        home: const MainNavigation(),
-        debugShowCheckedModeBanner: false,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => V2RayService()),
+        ChangeNotifierProvider(create: (_) => ThemeService()),
+      ],
+      child: Consumer<ThemeService>(
+        builder: (context, themeService, child) {
+          return FluentApp(
+            title: 'Zed-Secure VPN',
+            themeMode: themeService.themeMode,
+            darkTheme: AppTheme.darkTheme(),
+            theme: AppTheme.lightTheme(),
+            home: const MainNavigation(),
+            debugShowCheckedModeBanner: false,
+          );
+        },
       ),
     );
   }

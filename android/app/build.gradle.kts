@@ -21,9 +21,9 @@ android {
     defaultConfig {
         applicationId = "com.zedsecure.vpn"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = 1
-        versionName = "1.0.1"
+        targetSdk = 36
+        versionCode = 3
+        versionName = "1.2.0"
 
         manifestPlaceholders.put("io.flutter.embedding.android.EnableImpeller", "false")
     }
@@ -36,10 +36,21 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            val keystorePropertiesFile = rootProject.file("key.properties")
+            if (keystorePropertiesFile.exists()) {
+                val keystoreProperties = java.util.Properties()
+                keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+                
+                storeFile = file(keystoreProperties["storeFile"] ?: "zedsecure-release-new.keystore")
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            } else {
+                storeFile = file("zedsecure-release-new.keystore")
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "ZedS3cur3VPN2024StrongKey"
+                keyAlias = "zedsecure"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "ZedS3cur3VPN2024StrongKey"
+            }
         }
     }
 

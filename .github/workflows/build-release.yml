@@ -1,15 +1,10 @@
-name: Build and Release APK
+name: Build & Release APK
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version number (e.g., 1.0.0)'
-        required: true
-        default: '1.0.0'
 
 jobs:
   build:
@@ -17,117 +12,166 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v4
-        
+      
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
-          
+      
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.3'
+          flutter-version: '3.35.5'
           channel: 'stable'
           cache: true
-          
-      - name: Get dependencies
+      
+      - name: Flutter Doctor
+        run: flutter doctor -v
+      
+      - name: Install Dependencies
         run: flutter pub get
-        
-      - name: Build APK - Split per ABI
-        run: flutter build apk --release --split-per-abi
-        
-      - name: Rename APK files
-        run: |
-          mkdir -p output
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk output/ZedSecure-v${{ github.ref_name }}-arm64-v8a.apk
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk output/ZedSecure-v${{ github.ref_name }}-armeabi-v7a.apk
-          ls -lh output/
-          
-      - name: Get version from tag
-        id: get_version
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-          fi
-          
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
+      
+      - name: Decode Keystore
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/zedsecure-release-new.keystore
+          else
+            echo "Warning: KEYSTORE_BASE64 secret not found. Build may fail."
+          fi
+      
+      - name: Create key.properties
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "storeFile=zedsecure-release-new.keystore" > android/key.properties
+            echo "storePassword=$KEYSTORE_PASSWORD" >> android/key.properties
+            echo "keyAlias=zedsecure" >> android/key.properties
+            echo "keyPassword=$KEY_PASSWORD" >> android/key.properties
+          else
+            echo "Warning: Keystore secrets not found. Build may fail."
+          fi
+      
+      - name: Build APK (ARM64-v8a)
+        run: flutter build apk --release --target-platform android-arm64
+      
+      - name: Build APK (ARMv7a)
+        run: flutter build apk --release --target-platform android-arm
+      
+      - name: Get Version
+        id: version
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="1.2.0"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Rename APK Files
+        run: |
+          mkdir -p release-apks
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release-apks/zedsecure-${{ steps.version.outputs.version }}-arm64-v8a.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release-apks/zedsecure-${{ steps.version.outputs.version }}-armeabi-v7a.apk
+      
+      - name: Upload ARM64 APK
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Zed-Secure v${{ steps.get_version.outputs.VERSION }}
+          name: zedsecure-arm64-v8a
+          path: release-apks/zedsecure-${{ steps.version.outputs.version }}-arm64-v8a.apk
+      
+      - name: Upload ARMv7 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: zedsecure-armeabi-v7a
+          path: release-apks/zedsecure-${{ steps.version.outputs.version }}-armeabi-v7a.apk
+      
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release-apks/zedsecure-${{ steps.version.outputs.version }}-arm64-v8a.apk
+            release-apks/zedsecure-${{ steps.version.outputs.version }}-armeabi-v7a.apk
           body: |
-            ## 🎉 Zed-Secure VPN v${{ steps.get_version.outputs.VERSION }}
+            ## 🚀 Zed-Secure VPN ${{ steps.version.outputs.version }}
             
-            ### 📥 Download APK
+            ### 📥 Downloads
             
-            Choose the APK for your device:
+            **Recommended**: `zedsecure-${{ steps.version.outputs.version }}-arm64-v8a.apk` (for most modern devices)
             
-            | Architecture | Recommended For | File Size |
-            |--------------|----------------|-----------|
-            | **ARM64** | Most modern Android devices (2019+) | ~70-90 MB |
-            | **ARMv7** | Older devices (2015-2019) | ~70-90 MB |
+            - **ARM64-v8a**: For most modern Android devices (2015+) - **RECOMMENDED**
+            - **ARMv7a**: For older Android devices (2012-2015)
             
-            ### ✨ Features
+            ### ✨ What's New in v1.2.0
             
-            - 🔒 **Multi-Protocol Support**: VMess, VLESS, Trojan, Shadowsocks
-            - 🌐 **Transport Types**: TCP, WebSocket, HTTP/2, gRPC, QUIC
-            - 📊 **Real-time Stats**: Upload/Download speed, connection time
-            - 🎯 **Per-App Proxy**: Route specific apps through VPN
-            - 🔄 **Auto-Update**: Subscription management with auto-refresh
-            - ⚡ **Server Testing**: Ping all servers and auto-sort by latency
-            - 📱 **Modern UI**: Microsoft Fluent Design with Glassmorphism
-            - 📋 **Quick Import**: Copy config and paste directly
+            #### Major Features
+            - ✨ **Light/Dark Mode**: Toggle between themes in Settings
+            - ⚡ **Concurrent Ping**: Test all servers simultaneously (much faster!)
+            - 💾 **Backup & Restore**: Export/import your configs as JSON
+            - 📷 **QR Code Scanner**: Scan configs with camera
+            - 🎨 **Improved UI**: Better config cards, click-to-select, 2-line names
             
-            ### 📋 System Requirements
+            #### Enhancements
+            - 🎯 **Individual Ping Button**: Test specific servers on demand
+            - 🗑️ **Delete Dead Configs**: Remove failed servers with one tap
+            - 📋 **Three-Dot Menu**: Copy config, show QR, delete per config
+            - 🔧 **Better About Section**: Developer info with GitHub link
+            - 📦 **Updated Dependencies**: Flutter 3.35.5, Dart 3.9.2, Kotlin 2.2.20
             
-            - **Android**: 7.0 (Nougat) or higher (API 24+)
-            - **Storage**: 50-100 MB free space
-            - **RAM**: 2 GB recommended
+            #### Protocol Support
+            - 🚀 **XHTTP Transport** (new in Xray 1.25.3)
+            - 🚀 **HTTPUpgrade Transport** (new in Xray 1.25.3)
             
-            ### 🚀 Installation
+            #### Bug Fixes
+            - 🐛 Fixed config name display (now shows 2 lines)
+            - 🐛 Fixed UI overflow in header icons
+            - 🐛 Fixed card size after ping
+            - 🐛 Removed select button, click card to select
+            - 🐛 Fixed notification persistence issue
+            
+            ### 📝 Installation
             
             1. Download the appropriate APK for your device
             2. Enable "Install from Unknown Sources" in Android settings
-            3. Open the APK file and install
-            4. Grant VPN permission when prompted
+            3. Install the APK
+            4. Grant VPN and notification permissions
+            5. Enjoy secure browsing!
             
-            ### 📖 Quick Start
+            ### ⚠️ Google Play Protect Warning
             
-            1. Open Zed-Secure
-            2. Go to **Subscriptions** tab
-            3. Activate the **Suggested Subscription** or add your own
-            4. Go to **Servers** tab
-            5. Select a server (tap the radio button)
-            6. Go to **Home** and tap **Connect**
+            If you see "App scan recommended" or similar warnings, this is normal for apps not distributed through Google Play Store. The app is **open source** and safe. You can:
+            - Click "Install Anyway" or "Install Without Scanning"
+            - Or review the source code yourself: https://github.com/CluvexStudio/ZedSecure
             
-            ### 🐛 Bug Reports
+            ### 🔐 Security
             
-            Found an issue? [Report it here](https://github.com/${{ github.repository }}/issues)
+            - ✅ Open Source - Fully transparent code
+            - ✅ No data collection or telemetry
+            - ✅ Encrypted local storage
+            - ✅ GPL-3.0 Licensed
             
-            ### 📝 Changelog
+            ### 📖 Documentation
             
-            See all changes: [Full Changelog](https://github.com/${{ github.repository }}/commits/v${{ steps.get_version.outputs.VERSION }})
+            - [README](https://github.com/CluvexStudio/ZedSecure/blob/main/README.md)
+            - [Build Instructions](https://github.com/CluvexStudio/ZedSecure#-build-from-source)
+            - [Contributing Guide](https://github.com/CluvexStudio/ZedSecure/blob/main/CONTRIBUTING.md)
+            
+            ### 🙏 Support
+            
+            If you find this project helpful, please ⭐ star the repository!
+            
+            **Telegram Channel**: https://t.me/CluvexStudio
             
             ---
             
-            **⭐ If you find this app useful, please star the repository!**
-          draft: false
-          prerelease: false
-          files: |
-            output/*.apk
-          
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: apk-builds-v${{ steps.get_version.outputs.VERSION }}
-          path: output/*.apk
-          retention-days: 90
+            **Developed by CluvexStudio**  
+            *Building open-source tools for digital freedom and privacy*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
