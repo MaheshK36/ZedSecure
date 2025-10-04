@@ -53,11 +53,8 @@ jobs:
           echo "keyPassword=$KEY_PASSWORD" >> key.properties
           echo "✅ key.properties created successfully"
       
-      - name: Build APK (ARM64-v8a)
-        run: flutter build apk --release --target-platform android-arm64
-      
-      - name: Build APK (ARMv7a)
-        run: flutter build apk --release --target-platform android-arm
+      - name: Build APKs (All Architectures)
+        run: flutter build apk --release --split-per-abi
       
       - name: Get Version
         id: version
@@ -69,37 +66,43 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       
+      - name: List Built APKs
+        run: |
+          echo "📦 Built APK files:"
+          ls -lh build/app/outputs/flutter-apk/
+      
       - name: Rename APK Files
         run: |
           mkdir -p release-apks
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release-apks/zedsecure-${{ steps.version.outputs.version }}-arm64-v8a.apk
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release-apks/zedsecure-${{ steps.version.outputs.version }}-armeabi-v7a.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release-apks/ZedSecure-${{ steps.version.outputs.version }}-arm64-v8a.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release-apks/ZedSecure-${{ steps.version.outputs.version }}-armeabi-v7a.apk
+          echo "✅ APK files renamed successfully"
       
       - name: Upload ARM64 APK
         uses: actions/upload-artifact@v4
         with:
-          name: zedsecure-arm64-v8a
-          path: release-apks/zedsecure-${{ steps.version.outputs.version }}-arm64-v8a.apk
+          name: ZedSecure-arm64-v8a
+          path: release-apks/ZedSecure-${{ steps.version.outputs.version }}-arm64-v8a.apk
       
       - name: Upload ARMv7 APK
         uses: actions/upload-artifact@v4
         with:
-          name: zedsecure-armeabi-v7a
-          path: release-apks/zedsecure-${{ steps.version.outputs.version }}-armeabi-v7a.apk
+          name: ZedSecure-armeabi-v7a
+          path: release-apks/ZedSecure-${{ steps.version.outputs.version }}-armeabi-v7a.apk
       
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            release-apks/zedsecure-${{ steps.version.outputs.version }}-arm64-v8a.apk
-            release-apks/zedsecure-${{ steps.version.outputs.version }}-armeabi-v7a.apk
+            release-apks/ZedSecure-${{ steps.version.outputs.version }}-arm64-v8a.apk
+            release-apks/ZedSecure-${{ steps.version.outputs.version }}-armeabi-v7a.apk
           body: |
-            ## 🚀 Zed-Secure VPN ${{ steps.version.outputs.version }}
+            ## 🚀 ZedSecure VPN ${{ steps.version.outputs.version }}
             
             ### 📥 Downloads
             
-            **Recommended**: `zedsecure-${{ steps.version.outputs.version }}-arm64-v8a.apk` (for most modern devices)
+            **Recommended**: `ZedSecure-${{ steps.version.outputs.version }}-arm64-v8a.apk` (for most modern devices)
             
             - **ARM64-v8a**: For most modern Android devices (2015+) - **RECOMMENDED**
             - **ARMv7a**: For older Android devices (2012-2015)
