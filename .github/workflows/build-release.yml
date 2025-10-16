@@ -54,6 +54,10 @@ jobs:
           echo "✅ key.properties created successfully"
       
       - name: Build APKs (All Architectures)
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: flutter build apk --release --split-per-abi
       
       - name: Get Version
