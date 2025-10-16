@@ -25,8 +25,8 @@ android {
         applicationId = "com.zedsecure.vpn"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.3.0"
 
         manifestPlaceholders.put("io.flutter.embedding.android.EnableImpeller", "false")
     }
@@ -50,9 +50,9 @@ android {
                 keyPassword = keystoreProperties["keyPassword"] as String
             } else {
                 storeFile = file("zedsecure-release-new.keystore")
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "ZedS3cur3VPN2024StrongKey"
-                keyAlias = "zedsecure"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "ZedS3cur3VPN2024StrongKey"
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: throw GradleException("KEYSTORE_PASSWORD environment variable is not set")
+                keyAlias = System.getenv("KEY_ALIAS") ?: "zedsecure"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: throw GradleException("KEY_PASSWORD environment variable is not set")
             }
         }
     }

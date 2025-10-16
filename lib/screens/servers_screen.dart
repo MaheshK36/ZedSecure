@@ -1,6 +1,7 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:zedsecure/services/v2ray_service.dart';
+import 'package:zedsecure/services/theme_service.dart';
 import 'package:zedsecure/models/v2ray_config.dart';
 import 'package:zedsecure/theme/app_theme.dart';
 import 'package:flutter/services.dart';
@@ -62,7 +63,6 @@ class _ServersScreenState extends State<ServersScreen> {
 
     final service = Provider.of<V2RayService>(context, listen: false);
     
-    // Ping all servers concurrently (parallel) with maximum 10 at a time
     final futures = <Future>[];
     for (int i = 0; i < _configs.length; i++) {
       final config = _configs[i];
@@ -83,7 +83,6 @@ class _ServersScreenState extends State<ServersScreen> {
       
       futures.add(future);
       
-      // Process in batches of 10 to avoid too many concurrent requests
       if (futures.length >= 10 || i == _configs.length - 1) {
         await Future.wait(futures);
         futures.clear();
@@ -314,6 +313,7 @@ class _ServersScreenState extends State<ServersScreen> {
   Widget _buildServerCard(V2RayConfig config) {
     final ping = _pingResults[config.id];
     final service = Provider.of<V2RayService>(context, listen: false);
+    final themeService = Provider.of<ThemeService>(context, listen: false);
     final isConnected = service.activeConfig?.id == config.id;
     final isSelected = _selectedConfigId == config.id;
 
@@ -324,6 +324,7 @@ class _ServersScreenState extends State<ServersScreen> {
         decoration: AppTheme.glassDecoration(
           borderRadius: 12, 
           opacity: isConnected ? 0.15 : (isSelected ? 0.1 : 0.05),
+          isDark: themeService.isDarkMode,
         ).copyWith(
           border: isSelected && !isConnected
               ? Border.all(color: Colors.blue.withOpacity(0.5), width: 2)
@@ -693,7 +694,6 @@ class _ServersScreenState extends State<ServersScreen> {
   }
 
   Future<void> _scanQRCode() async {
-    // Request camera permission
     final status = await Permission.camera.request();
     if (!status.isGranted) {
       if (mounted) {

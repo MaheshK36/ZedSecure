@@ -1,6 +1,8 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:zedsecure/services/v2ray_service.dart';
+import 'package:zedsecure/services/country_detector.dart';
+import 'package:zedsecure/services/theme_service.dart';
 import 'package:zedsecure/theme/app_theme.dart';
 import 'package:zedsecure/models/v2ray_config.dart';
 
@@ -16,6 +18,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = Provider.of<ThemeService>(context);
+    final isDark = themeService.isDarkMode;
+    
     return Consumer<V2RayService>(
       builder: (context, v2rayService, child) {
         final isConnected = v2rayService.isConnected;
@@ -38,8 +43,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     constraints: const BoxConstraints(maxWidth: 500),
                     padding: const EdgeInsets.all(32),
-                    decoration: AppTheme.glassDecoration(borderRadius: 24, opacity: 0.05),
-                    child:                       Column(
+                    decoration: AppTheme.glassDecoration(borderRadius: 24, opacity: 0.05, isDark: isDark),
+                    child: Column(
                       children: [
                         Stack(
                           alignment: Alignment.center,
@@ -105,18 +110,42 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 16),
                         if (activeConfig != null) ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                CountryDetector.getFlagEmoji(v2rayService.detectedCountryCode ?? activeConfig.countryCode ?? 'XX'),
+                                style: const TextStyle(fontSize: 40),
+                              ),
+                              const SizedBox(width: 12),
+                              Flexible(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      activeConfig.remark,
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      CountryDetector.getCountryName(v2rayService.detectedCountryCode ?? activeConfig.countryCode ?? 'XX'),
+                                      style: TextStyle(fontSize: 13, color: Colors.grey[100]),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
                           Text(
-                            activeConfig.remark,
-                            style: const TextStyle(fontSize: 18),
+                            '${activeConfig.address}:${activeConfig.port}',
+                            style: TextStyle(fontSize: 13, color: Colors.grey[100]),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            '${activeConfig.address}:${activeConfig.port}',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[100]),
-                          ),
-                          const SizedBox(height: 8),
-                            Container(
+                          Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                               color: Colors.blue.withOpacity(0.2),
@@ -136,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Container(
                       constraints: const BoxConstraints(maxWidth: 500),
                       padding: const EdgeInsets.all(24),
-                      decoration: AppTheme.glassDecoration(borderRadius: 16, opacity: 0.05),
+                      decoration: AppTheme.glassDecoration(borderRadius: 16, opacity: 0.05, isDark: isDark),
                       child: Column(
                         children: [
                           Row(

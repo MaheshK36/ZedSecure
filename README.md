@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)
 ![Flutter](https://img.shields.io/badge/Flutter-3.35.5-02569B?logo=flutter)
 ![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?logo=android)
 ![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)
@@ -43,6 +43,8 @@ Telegram Channel = https://t.me/CluvexStudio
 - 📊 **Connection Monitoring**: Track network status and VPN health
 - 🎯 **Auto-Connect**: Remember last selected server
 - 🔐 **Secure Storage**: Encrypted local storage for sensitive data
+- 🌍 **Real Country Detection**: Automatically detect and display actual VPN location
+- 🛡️ **Custom DNS Settings**: Configure Primary & Secondary DNS servers
 
 ---
 
@@ -373,6 +375,37 @@ permission_handler: ^11.4.0 # Permissions
 flutter_lints: ^5.0.0
 flutter_launcher_icons: ^0.14.3
 ```
+
+---
+
+## 🔐 Security & CI/CD
+
+### GitHub Actions Build Setup
+
+This project uses **GitHub Actions** for automated APK building with secure keystore management.
+
+**📚 Complete Setup Guide:** [SECURITY_GUIDE.md](SECURITY_GUIDE.md)
+
+**Quick Setup:**
+1. Convert keystore to base64: `.\convert-keystore.ps1`
+2. Add 4 secrets to GitHub repository settings
+3. Push tag to trigger automated build: `git tag v1.3.0 && git push origin v1.3.0`
+
+**Required GitHub Secrets:**
+- `KEYSTORE_FILE_BASE64` - Your keystore encoded in base64
+- `KEYSTORE_PASSWORD` - Keystore password
+- `KEY_ALIAS` - Key alias (default: `zedsecure`)
+- `KEY_PASSWORD` - Key password
+
+**Security Features:**
+- ✅ No hardcoded passwords in code
+- ✅ Keystore excluded from repository
+- ✅ Automated builds via GitHub Actions
+- ✅ Secrets managed securely in GitHub
+
+For detailed instructions, see:
+- [SECURITY_GUIDE.md](SECURITY_GUIDE.md) - Complete security setup
+- [SETUP_GITHUB_SECRETS.md](SETUP_GITHUB_SECRETS.md) - Quick reference guide
 
 ---
 

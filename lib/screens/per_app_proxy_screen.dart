@@ -1,6 +1,8 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import 'package:zedsecure/services/theme_service.dart';
 import 'package:zedsecure/theme/app_theme.dart';
 
 class PerAppProxyScreen extends StatefulWidget {
@@ -162,12 +164,14 @@ class _PerAppProxyScreenState extends State<PerAppProxyScreen> {
                           final app = _filteredApps[index];
                           final packageName = app['packageName'] as String;
                           final isSelected = _selectedApps.contains(packageName);
+                          final themeService = Provider.of<ThemeService>(context, listen: false);
                           
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             decoration: AppTheme.glassDecoration(
                               borderRadius: 8,
                               opacity: isSelected ? 0.1 : 0.05,
+                              isDark: themeService.isDarkMode,
                             ),
                             child: ListTile(
                               title: Text(app['name'] as String),

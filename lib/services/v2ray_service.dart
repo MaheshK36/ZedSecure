@@ -19,6 +19,10 @@ class V2RayService extends ChangeNotifier {
   factory V2RayService() => _instance;
 
   late final V2ray _flutterV2ray;
+  
+  List<String> _customDnsServers = ['1.1.1.1', '1.0.0.1'];
+  bool _useDns = true;
+  String? _detectedCountryCode;
 
   V2RayStatus? get currentStatus => _currentStatus;
   V2RayConfig? get activeConfig => _activeConfig;
@@ -52,8 +56,50 @@ class V2RayService extends ChangeNotifier {
         notificationIconResourceName: "ic_launcher",
       );
       _isInitialized = true;
+      await _loadDnsSettings();
       await _tryRestoreActiveConfig();
     }
+  }
+  
+  Future<void> _loadDnsSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    _useDns = prefs.getBool('use_custom_dns') ?? true;
+    final dnsString = prefs.getString('custom_dns_servers');
+    if (dnsString != null && dnsString.isNotEmpty) {
+      _customDnsServers = dnsString.split(',');
+    }
+  }
+  
+  Future<void> saveDnsSettings(bool enabled, List<String> servers) async {
+    _useDns = enabled;
+    _customDnsServers = servers;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('use_custom_dns', enabled);
+    await prefs.setString('custom_dns_servers', servers.join(','));
+    notifyListeners();
+  }
+  
+  bool get useDns => _useDns;
+  List<String> get dnsServers => List.from(_customDnsServers);
+  String? get detectedCountryCode => _detectedCountryCode;
+
+  Future<String?> detectRealCountry() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://ipapi.co/json/'),
+      ).timeout(const Duration(seconds: 5));
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final countryCode = data['country_code'] as String?;
+        _detectedCountryCode = countryCode;
+        notifyListeners();
+        return countryCode;
+      }
+    } catch (e) {
+      debugPrint('Error detecting country: $e');
+    }
+    return null;
   }
 
   Future<bool> connect(V2RayConfig config) async {
@@ -61,6 +107,12 @@ class V2RayService extends ChangeNotifier {
       await initialize();
 
       V2RayURL parser = V2ray.parseFromURL(config.fullConfig);
+      
+      if (_useDns && _customDnsServers.isNotEmpty) {
+        parser.dns = {
+          'servers': _customDnsServers
+        };
+      }
 
       bool hasPermission = await _flutterV2ray.requestPermission();
       if (!hasPermission) {
@@ -80,6 +132,9 @@ class V2RayService extends ChangeNotifier {
 
       _activeConfig = config;
       await _saveActiveConfig(config);
+      
+      detectRealCountry();
+      
       notifyListeners();
 
       return true;
@@ -93,6 +148,7 @@ class V2RayService extends ChangeNotifier {
     try {
       await _flutterV2ray.stopV2Ray();
       _activeConfig = null;
+      _detectedCountryCode = null;
       await _clearActiveConfig();
       notifyListeners();
     } catch (e) {

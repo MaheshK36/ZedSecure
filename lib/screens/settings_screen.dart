@@ -95,6 +95,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
+              _buildNavigationTile(
+                'DNS Settings',
+                'Configure custom DNS servers',
+                FluentIcons.server_enviroment,
+                () => _showDnsDialog(),
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -151,8 +157,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'About',
             [
               _buildInfoTile('App Name', 'Zed-Secure'),
-              _buildInfoTile('Version', '1.2.0'),
-              _buildInfoTile('Build', '3'),
+              _buildInfoTile('Version', '1.3.0'),
+              _buildInfoTile('Build', '4'),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -196,8 +202,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSection(String title, List<Widget> children) {
+    final themeService = Provider.of<ThemeService>(context, listen: false);
     return Container(
-      decoration: AppTheme.glassDecoration(borderRadius: 12, opacity: 0.05),
+      decoration: AppTheme.glassDecoration(borderRadius: 12, opacity: 0.05, isDark: themeService.isDarkMode),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -574,7 +581,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       int configsImported = 0;
       int subsImported = 0;
 
-      // Import configs
       if (backupData['configs'] != null) {
         final configsList = backupData['configs'] as List;
         final existingConfigs = await service.loadConfigs();
@@ -594,7 +600,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await service.saveConfigs(existingConfigs);
       }
 
-      // Import subscriptions
       if (backupData['subscriptions'] != null) {
         final subsList = backupData['subscriptions'] as List;
         final existingSubs = await service.loadSubscriptions();
@@ -665,6 +670,119 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       debugPrint('Error copying URL: $e');
     }
+  }
+
+  Future<void> _showDnsDialog() async {
+    final service = Provider.of<V2RayService>(context, listen: false);
+    bool useDns = service.useDns;
+    List<String> dnsServers = service.dnsServers;
+    
+    final dns1Controller = TextEditingController(text: dnsServers.isNotEmpty ? dnsServers[0] : '1.1.1.1');
+    final dns2Controller = TextEditingController(text: dnsServers.length > 1 ? dnsServers[1] : '1.0.0.1');
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => ContentDialog(
+          title: const Text('DNS Settings'),
+          content: SizedBox(
+            width: 450,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Checkbox(
+                      checked: useDns,
+                      onChanged: (value) {
+                        setState(() {
+                          useDns = value ?? true;
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Use Custom DNS'),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (useDns) ...[
+                  const Text('Primary DNS', style: TextStyle(fontSize: 12)),
+                  const SizedBox(height: 4),
+                  TextBox(
+                    controller: dns1Controller,
+                    placeholder: '1.1.1.1',
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Secondary DNS', style: TextStyle(fontSize: 12)),
+                  const SizedBox(height: 4),
+                  TextBox(
+                    controller: dns2Controller,
+                    placeholder: '1.0.0.1',
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Popular DNS Providers:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        SizedBox(height: 8),
+                        Text('Cloudflare: 1.1.1.1, 1.0.0.1', style: TextStyle(fontSize: 11)),
+                        Text('Google: 8.8.8.8, 8.8.4.4', style: TextStyle(fontSize: 11)),
+                        Text('Quad9: 9.9.9.9, 149.112.112.112', style: TextStyle(fontSize: 11)),
+                        Text('OpenDNS: 208.67.222.222, 208.67.220.220', style: TextStyle(fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            Button(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final servers = <String>[];
+                if (dns1Controller.text.isNotEmpty) servers.add(dns1Controller.text.trim());
+                if (dns2Controller.text.isNotEmpty) servers.add(dns2Controller.text.trim());
+                
+                if (servers.isEmpty) {
+                  servers.addAll(['1.1.1.1', '1.0.0.1']);
+                }
+                
+                await service.saveDnsSettings(useDns, servers);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  await displayInfoBar(
+                    context,
+                    builder: (context, close) {
+                      return const InfoBar(
+                        title: Text('DNS Settings Saved'),
+                        content: Text('Changes will apply on next connection'),
+                        severity: InfoBarSeverity.success,
+                      );
+                    },
+                    duration: const Duration(seconds: 3),
+                  );
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    
+    dns1Controller.dispose();
+    dns2Controller.dispose();
   }
 }
 

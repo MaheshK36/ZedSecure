@@ -16,10 +16,11 @@ class AppTheme {
     return FluentThemeData(
       brightness: Brightness.light,
       accentColor: Colors.blue,
-      scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+      scaffoldBackgroundColor: const Color(0xFFF8F9FA),
       navigationPaneTheme: const NavigationPaneThemeData(
         backgroundColor: Color(0xFFFFFFFF),
       ),
+      cardColor: const Color(0xFFFFFFFF),
     );
   }
 
@@ -34,22 +35,48 @@ class AppTheme {
   static BoxDecoration glassDecoration({
     double borderRadius = 16,
     double opacity = 0.1,
+    bool isDark = true,
   }) {
-    return BoxDecoration(
-      borderRadius: BorderRadius.circular(borderRadius),
-      color: Colors.white.withOpacity(opacity),
-      border: Border.all(
-        color: Colors.white.withOpacity(0.2),
-        width: 1.5,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.3),
-          blurRadius: 20,
-          spreadRadius: 5,
+    if (isDark) {
+      return BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        color: Colors.white.withOpacity(opacity),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1.5,
         ),
-      ],
-    );
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 20,
+            spreadRadius: 5,
+          ),
+        ],
+      );
+    } else {
+      return BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        color: Colors.white,
+        border: Border.all(
+          color: const Color(0xFFE0E0E0),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            spreadRadius: 0,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      );
+    }
   }
 
   static BoxDecoration gradientButtonDecoration({

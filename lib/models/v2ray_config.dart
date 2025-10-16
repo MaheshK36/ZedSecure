@@ -1,3 +1,5 @@
+import 'package:zedsecure/services/country_detector.dart';
+
 class V2RayConfig {
   final String id;
   final String remark;
@@ -7,6 +9,7 @@ class V2RayConfig {
   final String fullConfig;
   bool isConnected;
   final String source;
+  final String? countryCode;
 
   V2RayConfig({
     required this.id,
@@ -17,7 +20,8 @@ class V2RayConfig {
     required this.fullConfig,
     this.isConnected = false,
     this.source = 'manual',
-  });
+    String? countryCode,
+  }) : countryCode = countryCode ?? CountryDetector.detectCountryCode(remark, address);
 
   factory V2RayConfig.fromJson(Map<String, dynamic> json) {
     return V2RayConfig(
@@ -29,6 +33,7 @@ class V2RayConfig {
       fullConfig: json['fullConfig'] as String,
       isConnected: json['isConnected'] as bool? ?? false,
       source: json['source'] as String? ?? 'manual',
+      countryCode: json['countryCode'] as String?,
     );
   }
 
@@ -42,6 +47,7 @@ class V2RayConfig {
       'fullConfig': fullConfig,
       'isConnected': isConnected,
       'source': source,
+      'countryCode': countryCode,
     };
   }
 
@@ -54,6 +60,7 @@ class V2RayConfig {
     String? fullConfig,
     bool? isConnected,
     String? source,
+    String? countryCode,
   }) {
     return V2RayConfig(
       id: id ?? this.id,
@@ -64,6 +71,7 @@ class V2RayConfig {
       fullConfig: fullConfig ?? this.fullConfig,
       isConnected: isConnected ?? this.isConnected,
       source: source ?? this.source,
+      countryCode: countryCode ?? this.countryCode,
     );
   }
 

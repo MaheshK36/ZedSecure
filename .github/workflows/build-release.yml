@@ -62,7 +62,7 @@ jobs:
           if [ "${{ github.ref_type }}" == "tag" ]; then
             VERSION="${{ github.ref_name }}"
           else
-            VERSION="1.2.0"
+            VERSION="1.3.0"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       
@@ -107,32 +107,31 @@ jobs:
             - **ARM64-v8a**: For most modern Android devices (2015+) - **RECOMMENDED**
             - **ARMv7a**: For older Android devices (2012-2015)
             
-            ### ✨ What's New in v1.2.0
+            ### ✨ What's New in v1.3.0
             
             #### Major Features
-            - ✨ **Light/Dark Mode**: Toggle between themes in Settings
-            - ⚡ **Concurrent Ping**: Test all servers simultaneously (much faster!)
-            - 💾 **Backup & Restore**: Export/import your configs as JSON
-            - 📷 **QR Code Scanner**: Scan configs with camera
-            - 🎨 **Improved UI**: Better config cards, click-to-select, 2-line names
+            - 🌍 **Real Country Detection**: Automatically detect and display the actual country flag after connecting to VPN
+            - 🛡️ **Custom DNS Settings**: Configure custom DNS servers (Primary & Secondary) in Settings
+            - 🎨 **Improved Light Theme**: Fixed blur effects and enhanced aesthetics for light mode
+            - 🔄 **Fixed Subscription Duplicate Bug**: Resolved issue where subscription configs were duplicated upon reactivation
+            
+            #### Updates
+            - 📦 **Updated Dependencies**: 
+              - fluent_ui: 4.13.0
+              - http: 1.5.0
+              - provider: 6.1.5
+              - shared_preferences: 2.5.3
+              - connectivity_plus: 7.0.0
+              - path_provider: 2.1.5
+              - permission_handler: 12.0.1
+              - flutter_lints: 6.0.0
+              - flutter_launcher_icons: 0.14.4
             
             #### Enhancements
-            - 🎯 **Individual Ping Button**: Test specific servers on demand
-            - 🗑️ **Delete Dead Configs**: Remove failed servers with one tap
-            - 📋 **Three-Dot Menu**: Copy config, show QR, delete per config
-            - 🔧 **Better About Section**: Developer info with GitHub link
-            - 📦 **Updated Dependencies**: Flutter 3.35.5, Dart 3.9.2, Kotlin 2.2.20
-            
-            #### Protocol Support
-            - 🚀 **XHTTP Transport** (new in Xray 1.25.3)
-            - 🚀 **HTTPUpgrade Transport** (new in Xray 1.25.3)
-            
-            #### Bug Fixes
-            - 🐛 Fixed config name display (now shows 2 lines)
-            - 🐛 Fixed UI overflow in header icons
-            - 🐛 Fixed card size after ping
-            - 🐛 Removed select button, click card to select
-            - 🐛 Fixed notification persistence issue
+            - 🌐 **Country Detection API**: Uses real IP geolocation to show actual VPN location
+            - 🔧 **Streamlined DNS Config**: Simplified to Primary & Secondary DNS only
+            - 🎨 **Cleaner Light Theme**: Removed glass effects, added clean white cards with subtle shadows
+            - 🧹 **Code Cleanup**: Removed all comments for cleaner codebase
             
             ### 📝 Installation
             

@@ -1,6 +1,7 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:zedsecure/services/v2ray_service.dart';
+import 'package:zedsecure/services/theme_service.dart';
 import 'package:zedsecure/models/subscription.dart';
 import 'package:zedsecure/theme/app_theme.dart';
 
@@ -201,9 +202,10 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   }
 
   Widget _buildSubscriptionCard(Subscription subscription) {
+    final themeService = Provider.of<ThemeService>(context, listen: false);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: AppTheme.glassDecoration(borderRadius: 12, opacity: 0.05),
+      decoration: AppTheme.glassDecoration(borderRadius: 12, opacity: 0.05, isDark: themeService.isDarkMode),
       child: ListTile(
         leading: Container(
           width: 48,
@@ -304,7 +306,11 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                 final configs = await service.parseSubscriptionUrl(urlController.text);
 
                 final existingConfigs = await service.loadConfigs();
-                final allConfigs = [...existingConfigs, ...configs];
+                
+                final existingFullConfigs = existingConfigs.map((c) => c.fullConfig).toSet();
+                final newConfigs = configs.where((config) => !existingFullConfigs.contains(config.fullConfig)).toList();
+                
+                final allConfigs = [...existingConfigs, ...newConfigs];
                 await service.saveConfigs(allConfigs);
 
                 final subscription = Subscription(
@@ -312,7 +318,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                   name: nameController.text,
                   url: urlController.text,
                   lastUpdate: DateTime.now(),
-                  configCount: configs.length,
+                  configCount: newConfigs.length,
                 );
 
                 _subscriptions.add(subscription);
@@ -325,7 +331,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                     builder: (context, close) {
                       return InfoBar(
                         title: const Text('Success'),
-                        content: Text('Added ${configs.length} servers'),
+                        content: Text('Added ${newConfigs.length} new servers'),
                         severity: InfoBarSeverity.success,
                       );
                     },
@@ -362,12 +368,17 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       final configs = await service.parseSubscriptionUrl(subscription.url);
 
       final existingConfigs = await service.loadConfigs();
-      final allConfigs = [...existingConfigs, ...configs];
+      
+      
+      final existingFullConfigs = existingConfigs.map((c) => c.fullConfig).toSet();
+      final newConfigs = configs.where((config) => !existingFullConfigs.contains(config.fullConfig)).toList();
+      
+      final allConfigs = [...existingConfigs, ...newConfigs];
       await service.saveConfigs(allConfigs);
 
       final activatedSub = subscription.copyWith(
         lastUpdate: DateTime.now(),
-        configCount: configs.length,
+        configCount: newConfigs.length,
       );
 
       _subscriptions.add(activatedSub);
@@ -383,7 +394,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           builder: (context, close) {
             return InfoBar(
               title: const Text('Subscription Activated'),
-              content: Text('Added ${configs.length} servers'),
+              content: Text('Added ${newConfigs.length} new servers'),
               severity: InfoBarSeverity.success,
             );
           },
