@@ -9,7 +9,7 @@
 
 **A professional, modern VPN application for Android with support for V2Ray/Xray protocols**
 
-[Features](#-features) • [Installation](#-installation) • [Build](#-build-from-source) • [Screenshots](#-screenshots) • [Contributing](#-contributing)
+[Features](#-features) • [Installation](#-installation) • [Build](#-build-from-source) • [Contributing](#-contributing)
 
 </div>
 
@@ -48,18 +48,6 @@ Telegram Channel = https://t.me/CluvexStudio
 
 ---
 
-## 📱 Screenshots
-
-<div align="center">
-
-| Home Screen | Servers | Settings |
-|------------|---------|----------|
-| *Coming Soon* | *Coming Soon* | *Coming Soon* |
-
-</div>
-
----
-
 ## 🔧 Tech Stack
 
 - **Frontend**: Flutter 3.35.5 (Dart 3.9.2)
@@ -85,7 +73,7 @@ Download the latest APK from [GitHub Releases](https://github.com/CluvexStudio/Z
 
 - **Android**: 7.0 (Nougat) or higher
 - **Architecture**: ARM64-v8a, ARMv7, x86_64
-- **Storage**: ~50 MB
+- **Storage**: ~30 MB
 - **RAM**: Minimum 2 GB recommended
 
 ---
@@ -376,36 +364,12 @@ flutter_lints: ^5.0.0
 flutter_launcher_icons: ^0.14.3
 ```
 
----
-
-## 🔐 Security & CI/CD
-
-### GitHub Actions Build Setup
-
-This project uses **GitHub Actions** for automated APK building with secure keystore management.
-
-**📚 Complete Setup Guide:** [SECURITY_GUIDE.md](SECURITY_GUIDE.md)
-
-**Quick Setup:**
-1. Convert keystore to base64: `.\convert-keystore.ps1`
-2. Add 4 secrets to GitHub repository settings
-3. Push tag to trigger automated build: `git tag v1.3.0 && git push origin v1.3.0`
-
-**Required GitHub Secrets:**
-- `KEYSTORE_FILE_BASE64` - Your keystore encoded in base64
-- `KEYSTORE_PASSWORD` - Keystore password
-- `KEY_ALIAS` - Key alias (default: `zedsecure`)
-- `KEY_PASSWORD` - Key password
-
 **Security Features:**
 - ✅ No hardcoded passwords in code
 - ✅ Keystore excluded from repository
 - ✅ Automated builds via GitHub Actions
 - ✅ Secrets managed securely in GitHub
 
-For detailed instructions, see:
-- [SECURITY_GUIDE.md](SECURITY_GUIDE.md) - Complete security setup
-- [SETUP_GITHUB_SECRETS.md](SETUP_GITHUB_SECRETS.md) - Quick reference guide
 
 ---
 
